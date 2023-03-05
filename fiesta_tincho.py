@@ -18,6 +18,40 @@ dx = 5
 dy = 3
 color = (0, 0, 0)
 
+def shuffle_cols(frame):
+    # Get the width of the frame
+    h, w, _ = frame.shape
+    # Define the width of each group
+    group_width = np.random.randint(1, 6)
+    # Calculate the number of groups
+    num_groups = w // group_width
+    # Randomly shuffle the groups
+    group_order = np.random.permutation(num_groups)
+    # Create a list of group indices
+    group_indices = [i * group_width for i in range(num_groups)]
+    # Add the remaining columns as a last group
+    group_indices.append(w)
+    # Shuffle the columns within each group
+    for i in range(num_groups):
+        start = group_indices[group_order[i]]
+        end = group_indices[group_order[i] + 1]
+        col_index = np.random.permutation(end - start) + start
+        frame[:, start:end, :] = frame[:, col_index, :]
+    return frame
+
+def borrar_caras(frame, gray):
+    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+    for (x, y, w, h) in faces:
+        # Get the face region
+        face_region = frame[y:y+h, x:x+w]
+        
+        # Apply the blur effect on the face region
+        face_region = cv2.GaussianBlur(face_region, (23, 23), 30)
+        
+        # Put the blurred face region back into the frame
+        frame[y:y+h, x:x+w] = face_region
+    return frame
+
 def pixeles_repetidos_horizontal(frame, pixel_art):
     # Crop the frame to the left half
     left_half = frame[:, :half_width]
@@ -74,6 +108,7 @@ def pixeles_repetidos_vertical(frame, pixel_art):
     return screen, pixel_art
 
 def add_text(frame):
+    
     global x, y, dx, dy, color
     cv2.putText(frame, "@juanma.tuki", (x, y), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
     x += dx
@@ -175,7 +210,7 @@ pixel_arth = np.zeros((height, half_width, 3), dtype=np.uint8)
 # Set the initial time
 start_time = cv2.getTickCount()
 # Set the interval time (5 minutes = 5*60*cv2.getTickFrequency())
-interval_time = 5*0.60*cv2.getTickFrequency()
+interval_time = 0.5*60*cv2.getTickFrequency()
 
 # Set the initial function to be called
 current_function = juanma_tuki
@@ -194,7 +229,7 @@ while True:
     
     if cv2.getTickCount() - start_time > interval_time:
         # Switch to the other function
-        if current_function == mirror_randomly:
+        if current_function == borrar_caras:
             current_function = pixeles_repetidos_horizontal
         elif current_function == pixeles_repetidos_horizontal:
             current_function = detectar_caras
@@ -204,6 +239,10 @@ while True:
             current_function = juanma_tuki
         elif current_function == juanma_tuki:
             current_function = mirror_randomly
+        elif current_function == mirror_randomly:
+            current_function = shuffle_cols
+        elif current_function == shuffle_cols:
+            current_function = borrar_caras  
 
         # Update the start time
         start_time = cv2.getTickCount()
@@ -221,6 +260,10 @@ while True:
         frame = mirror_randomly(frame)
     elif current_function == juanma_tuki:
         frame = juanma_tuki(frame)
+    elif current_function == borrar_caras:
+        frame = borrar_caras(frame, gray)
+    elif current_function == shuffle_cols:
+        frame = shuffle_cols(frame)
     # Apply the cool effect to the frame
     # frame = detectar_caras(frame, gray)
     cv2.imshow("Cool Video Effect", frame)
